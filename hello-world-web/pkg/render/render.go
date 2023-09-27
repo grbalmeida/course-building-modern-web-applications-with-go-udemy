@@ -1,25 +1,82 @@
 package render
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"net/http"
+	"path/filepath"
 	"text/template"
 )
 
 func RenderTemplate(w http.ResponseWriter, tmpl string) {
-	parsedTemplate, _ := template.ParseFiles(fmt.Sprintf("./templates/%s.html", tmpl), "./templates/base.layout.tmpl.html")
-	err := parsedTemplate.Execute(w, nil)
+	// create a template cache
+	tc, err := createComplexTemplateCache()
 
 	if err != nil {
-		fmt.Println("error parsing template:", err)
-		return
+		log.Fatal("17", err)
 	}
+	// get requested template from cache
+	t, ok := tc[tmpl]
+
+	if !ok {
+		log.Fatal("23", err)
+	}
+
+	buf := new(bytes.Buffer)
+
+	err = t.Execute(buf, nil)
+
+	if err != nil {
+		log.Println(err)
+	}
+
+	// render the template
+	_, err = buf.WriteTo(w)
+
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func createComplexTemplateCache() (map[string]*template.Template, error) {
+	myCache := map[string]*template.Template{}
+
+	// get all of the files named *.page.tmpl from ./templates
+	pages, err := filepath.Glob("./templates/*.page.tmpl.html")
+
+	if err != nil {
+		return myCache, err
+	}
+
+	// range through all files ending with *.page.tmpl
+	for _, page := range pages {
+		name := filepath.Base(page)
+		ts, err := template.New(name).ParseFiles(page)
+
+		if err != nil {
+			return myCache, err
+		}
+
+		matches, err := filepath.Glob("./templates/*.layout.tmpl.html")
+
+		if err != nil {
+			return myCache, err
+		}
+
+		if len(matches) > 0 {
+			ts, err = ts.ParseGlob("./templates/*.layout.tmpl.html")
+		}
+
+		myCache[name] = ts
+	}
+
+	return myCache, nil
 }
 
 var tc = make(map[string]*template.Template)
 
-func RenderTemplateTest(w http.ResponseWriter, t string) {
+func RenderSimpleTemplate(w http.ResponseWriter, t string) {
 	var tmpl *template.Template
 	var err error
 
@@ -29,7 +86,7 @@ func RenderTemplateTest(w http.ResponseWriter, t string) {
 	if !inMap {
 		// need to create the template
 		log.Println("creating template and adding to cache")
-		err = createTemplateCache(t)
+		err = createSimpleTemplateCache(t)
 
 		if err != nil {
 			log.Println(err)
@@ -48,7 +105,7 @@ func RenderTemplateTest(w http.ResponseWriter, t string) {
 	}
 }
 
-func createTemplateCache(t string) error {
+func createSimpleTemplateCache(t string) error {
 	templates := []string{
 		fmt.Sprintf("./templates/%s.html", t),
 		"./templates/base.layout.tmpl.html",
