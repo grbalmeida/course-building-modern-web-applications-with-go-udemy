@@ -7,20 +7,32 @@ import (
 	"net/http"
 	"path/filepath"
 	"text/template"
+
+	"github.com/grbalmeida/building-modern-web-applications-with-go/pkg/config"
 )
 
-func RenderTemplate(w http.ResponseWriter, tmpl string) {
-	// get the template cache from the app config
-	tc, err := CreateComplexTemplateCache()
+var app *config.AppConfig
 
-	if err != nil {
-		log.Fatal(err)
+// NewTemplates sets the config for the template package
+func NewTemplates(a *config.AppConfig) {
+	app = a
+}
+
+func RenderTemplate(w http.ResponseWriter, tmpl string) {
+	var tc map[string]*template.Template
+
+	if app.UseCache {
+		// get the template cache from the app config
+		tc = app.TemplateCache
+	} else {
+		tc, _ = CreateComplexTemplateCache()
 	}
+
 	// get requested template from cache
 	t, ok := tc[tmpl]
 
 	if !ok {
-		log.Fatal(err)
+		log.Fatal("Could not get template from template cache")
 	}
 
 	buf := new(bytes.Buffer)
@@ -28,7 +40,7 @@ func RenderTemplate(w http.ResponseWriter, tmpl string) {
 	_ = t.Execute(buf, nil)
 
 	// render the template
-	_, err = buf.WriteTo(w)
+	_, err := buf.WriteTo(w)
 
 	if err != nil {
 		log.Println("Error writing template to browser", err)
